@@ -1,119 +1,112 @@
 (() => {
   'use strict';
 
-  const SEARCH_ID = 'yt-playlist-search-box';
-
   function injectSearchBox() {
+    const renderers = document.querySelectorAll('ytd-add-to-playlist-renderer');
 
-    // 二重追加防止
-    if (document.getElementById(SEARCH_ID)) {
-      return;
+    renderers.forEach(renderer => {
+      if (renderer.dataset.searchInjected) return;
+
+      const root = renderer.shadowRoot || renderer;
+      const dialogHeader = root.querySelector('#header');
+      const playlistContainer = root.querySelector('#playlists');
+
+      if (!dialogHeader || !playlistContainer) return;
+
+      renderer.dataset.searchInjected = 'true';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = 'プレイリスト検索...';
+
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = 'background:#212121;padding:8px 16px;flex-shrink:0;';
+
+      const stop = (e) => e.stopPropagation();
+      ['mousedown', 'mouseup', 'click', 'pointerdown', 'touchstart'].forEach(ev => {
+        input.addEventListener(ev, stop);
+        wrapper.addEventListener(ev, stop);
+      });
+
+      Object.assign(input.style, {
+        width: '100%',
+        padding: '10px 12px',
+        background: '#121212',
+        color: 'white',
+        border: '1px solid #444',
+        borderRadius: '8px',
+        fontSize: '14px',
+        boxSizing: 'border-box'
+      });
+
+      wrapper.appendChild(input);
+      dialogHeader.insertAdjacentElement('afterend', wrapper);
+
+      input.addEventListener('input', () => {
+        const query = input.value.trim().toLowerCase();
+        playlistContainer.querySelectorAll('ytd-playlist-add-to-option-renderer').forEach(item => {
+          const itemRoot = item.shadowRoot || item;
+          const labelEl = itemRoot.querySelector('#label');
+          const title = labelEl ? (labelEl.getAttribute('title') || labelEl.textContent) : '';
+          item.style.display = title.toLowerCase().includes(query) ? '' : 'none';
+        });
+      });
+
+      console.log('playlist search injected', renderer);
+    });
+
+    if (!document.querySelector('ytd-add-to-playlist-renderer')) {
+      const listView = document.querySelector('yt-list-view-model');
+      if (listView && listView.parentElement && !listView.parentElement.dataset.searchInjected) {
+        insertToNormalPage(listView.parentElement);
+      }
     }
+  }
 
-    // プレイリスト一覧
-    const listView = document.querySelector(
-      'yt-list-view-model'
-    );
+  function insertToNormalPage(container) {
+    container.dataset.searchInjected = 'true';
 
-    if (!listView) {
-      return;
-    }
-
-    // プレイリスト項目
-    const items = listView.querySelectorAll(
-      'toggleable-list-item-view-model'
-    );
-
-    if (!items.length) {
-      return;
-    }
-
-    // リストコンテナ
-    const container = listView.parentElement;
-
-    if (!container) {
-      return;
-    }
-
-    // 検索欄
     const input = document.createElement('input');
-
-    input.id = SEARCH_ID;
     input.type = 'text';
     input.placeholder = 'プレイリスト検索...';
 
-    // ダイアログ閉鎖対策
-    const stop = (e) => {
-      e.stopPropagation();
-    };
-
-    input.addEventListener('mousedown', stop);
-    input.addEventListener('mouseup', stop);
-    input.addEventListener('click', stop);
-    input.addEventListener('pointerdown', stop);
-    input.addEventListener('touchstart', stop);
-
-    // ラッパー
     const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'position:sticky;top:0;z-index:9999;background:#212121;padding:8px;flex-shrink:0;';
 
-    wrapper.style.position = 'sticky';
-    wrapper.style.top = '0';
-    wrapper.style.zIndex = '9999';
+    const stop = (e) => e.stopPropagation();
+    ['mousedown', 'mouseup', 'click', 'pointerdown', 'touchstart'].forEach(ev => {
+      input.addEventListener(ev, stop);
+      wrapper.addEventListener(ev, stop);
+    });
 
-    wrapper.style.background = '#212121';
-
-    wrapper.style.padding = '8px';
-    wrapper.style.flexShrink = '0';
-
-    // 検索欄スタイル
     Object.assign(input.style, {
       width: '100%',
       padding: '10px 12px',
-
       background: '#121212',
       color: 'white',
-
       border: '1px solid #444',
       borderRadius: '8px',
-
       fontSize: '14px',
       boxSizing: 'border-box'
     });
 
     wrapper.appendChild(input);
-
-    // リストコンテナ先頭へ追加
     container.prepend(wrapper);
 
-    // 検索処理
     input.addEventListener('input', () => {
-
-      const query =
-        input.value.trim().toLowerCase();
-
-      const currentItems = listView.querySelectorAll(
-        'toggleable-list-item-view-model'
-      );
-
-      currentItems.forEach(item => {
-
-        const title =
-          item.querySelector(
-            '.ytListItemViewModelTitleWrapper'
-          )?.textContent || '';
-
-        const matched =
-          title.toLowerCase().includes(query);
-
-        item.style.display =
-          matched ? '' : 'none';
-      });
+      const query = input.value.trim().toLowerCase();
+      const listView = container.querySelector('yt-list-view-model');
+      if (listView) {
+        listView.querySelectorAll('toggleable-list-item-view-model').forEach(item => {
+          const title = item.querySelector('.ytListItemViewModelTitleWrapper')?.textContent || '';
+          item.style.display = title.toLowerCase().includes(query) ? '' : 'none';
+        });
+      }
     });
 
-    console.log('playlist search injected');
+    console.log('playlist search injected into page');
   }
 
-  // DOM監視
   const observer = new MutationObserver(() => {
     injectSearchBox();
   });
@@ -122,5 +115,4 @@
     childList: true,
     subtree: true
   });
-
 })();
