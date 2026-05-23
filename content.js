@@ -2,6 +2,7 @@
   'use strict';
 
   function injectSearchBox() {
+    // --- A. 複数選択拡張機能用（ytd-add-to-playlist-renderer）の処理 ---
     const renderers = document.querySelectorAll('ytd-add-to-playlist-renderer');
 
     renderers.forEach(renderer => {
@@ -22,9 +23,9 @@
       const wrapper = document.createElement('div');
       wrapper.style.cssText = 'background:#212121;padding:8px 16px;flex-shrink:0;';
 
+      // ダイアログ閉鎖対策
       const stop = (e) => e.stopPropagation();
       ['mousedown', 'mouseup', 'click', 'pointerdown', 'touchstart'].forEach(ev => {
-        input.addEventListener(ev, stop);
         wrapper.addEventListener(ev, stop);
       });
 
@@ -52,13 +53,31 @@
         });
       });
 
-      console.log('playlist search injected', renderer);
+      console.log('playlist search injected (multi-select dialog)', renderer);
     });
 
+    // --- B. 通常ページ / 通常ダイアログ用の処理 ---
+    // 複数選択用レンダラーがない場合のみ実行
     if (!document.querySelector('ytd-add-to-playlist-renderer')) {
       const listView = document.querySelector('yt-list-view-model');
-      if (listView && listView.parentElement && !listView.parentElement.dataset.searchInjected) {
-        insertToNormalPage(listView.parentElement);
+      
+      if (listView) {
+        // ②の修正：3点リーダー（role="menu" など）の場合は検索バーを入れない
+        // すでに間違って入ってしまっているラッパーがあれば削除する
+        if (listView.getAttribute('role') !== 'list') {
+          const parent = listView.parentElement;
+          if (parent && parent.dataset.searchInjected) {
+            parent.querySelector('.custom-search-wrapper')?.remove();
+            delete parent.dataset.searchInjected;
+            console.log('playlist search removed (context switched from 3-dot menu)');
+          }
+          return;
+        }
+
+        // 正しいコンテキスト（role="list"）かつ、未挿入なら挿入
+        if (listView.parentElement && !listView.parentElement.dataset.searchInjected) {
+          insertToNormalPage(listView.parentElement);
+        }
       }
     }
   }
@@ -71,11 +90,12 @@
     input.placeholder = 'プレイリスト検索...';
 
     const wrapper = document.createElement('div');
+    // 後から削除できるように識別用のクラス名を追加
+    wrapper.className = 'custom-search-wrapper';
     wrapper.style.cssText = 'position:sticky;top:0;z-index:9999;background:#212121;padding:8px;flex-shrink:0;';
 
     const stop = (e) => e.stopPropagation();
     ['mousedown', 'mouseup', 'click', 'pointerdown', 'touchstart'].forEach(ev => {
-      input.addEventListener(ev, stop);
       wrapper.addEventListener(ev, stop);
     });
 
