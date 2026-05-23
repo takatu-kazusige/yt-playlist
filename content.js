@@ -57,29 +57,32 @@
     });
 
     // --- B. 通常ページ / 通常ダイアログ用の処理 ---
-    // 複数選択用レンダラーがない場合のみ実行
-    if (!document.querySelector('ytd-add-to-playlist-renderer')) {
-      const listView = document.querySelector('yt-list-view-model');
-      
-      if (listView) {
-        // ②の修正：3点リーダー（role="menu" など）の場合は検索バーを入れない
-        // すでに間違って入ってしまっているラッパーがあれば削除する
-        if (listView.getAttribute('role') !== 'list') {
-          const parent = listView.parentElement;
-          if (parent && parent.dataset.searchInjected) {
-            parent.querySelector('.custom-search-wrapper')?.remove();
-            delete parent.dataset.searchInjected;
-            console.log('playlist search removed (context switched from 3-dot menu)');
-          }
-          return;
-        }
+    // 【改善】A（複数選択）の有無に関わらず、画面上のすべての `yt-list-view-model` を個別に精査する
+    const listViews = document.querySelectorAll('yt-list-view-model');
+    
+    listViews.forEach(listView => {
+      const parent = listView.parentElement;
+      if (!parent) return;
 
-        // 正しいコンテキスト（role="list"）かつ、未挿入なら挿入
-        if (listView.parentElement && !listView.parentElement.dataset.searchInjected) {
-          insertToNormalPage(listView.parentElement);
+      // ① 3点リーダーメニュー（role !== 'list'）の場合の処理
+      if (listView.getAttribute('role') !== 'list') {
+        // 過去の使い回しや誤挿入で残ってしまった検索バーがあれば、確実に削除してフラグもリセット
+        const existingWrapper = parent.querySelector('.custom-search-wrapper');
+        if (existingWrapper) {
+          existingWrapper.remove();
+          delete parent.dataset.searchInjected;
+          console.log('playlist search removed (3-dot menu cleaned)');
         }
+        return; 
       }
-    }
+
+      // ② 正しい通常ダイアログ（role === 'list'）の場合の処理
+      if (!parent.dataset.searchInjected) {
+        // YouTubeが要素を使い回した際にゴミが残っていないか念のため掃除してから挿入
+        parent.querySelector('.custom-search-wrapper')?.remove();
+        insertToNormalPage(parent);
+      }
+    });
   }
 
   function insertToNormalPage(container) {
